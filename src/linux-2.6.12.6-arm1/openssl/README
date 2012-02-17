@@ -1,0 +1,26 @@
+OpenSSL
+===========
+ In order to explore the Orion CESA through the OpenSSL, you have to use the OpenSSL OCF cryptodev engine.
+ By default the cryptodev engine will use the CESA accelerator.
+
+ On the Orion FS create a crypto dev: mknod /dev/crypto c 10 70
+ download openssl-0.9.7e (http://www.openssl.org/), then untar+unzip it.
+ apply the patches (in the following order):
+  - openssl-0.9.7e.diff - a patch from OCF for the OpenSSL cryptodev, with a our patch to support AES256 and more.
+  - speed_multi.diff - fix for multi task results reporting. (NOT A MUST)
+ and compile ...
+
+ you can run a speed test to make sure everything is working:
+ openssl speed -evp des-ede3-cbc -size 8192 -elapsed            Vs.
+ openssl speed -evp des-ede3-cbc -engine cryptodev -size 8192 -elapsed
+
+  OpenSSH
+==========
+ This release also include a patch from the OCF release, which enables cryptodev by default.
+ download openssh-3.7.1p2.diff, then untar+unzip it.
+ apply the patch openssh-3.7.1p2.diff.
+ and compile ...
+
+ you can run:
+ ssh  -c 3des-cbc -l <user name> <IP>
+

@@ -1,0 +1,154 @@
+Index: ssh-add.c
+diff -c ssh-add.c:1.1.1.4 ssh-add.c:1.2
+*** ssh-add.c:1.1.1.4	Thu Sep 25 15:16:37 2003
+--- ssh-add.c	Tue Nov 30 15:56:27 2004
+***************
+*** 38,43 ****
+--- 38,44 ----
+  RCSID("$OpenBSD: ssh-add.c,v 1.68 2003/06/16 10:22:45 markus Exp $");
+  
+  #include <openssl/evp.h>
++ #include <openssl/engine.h>
+  
+  #include "ssh.h"
+  #include "rsa.h"
+***************
+*** 325,330 ****
+--- 326,335 ----
+  
+  	SSLeay_add_all_algorithms();
+  
++ 	/* Init available hardware crypto engines. */
++ 	ENGINE_load_builtin_engines();
++ 	ENGINE_register_all_complete();
++ 
+  	/* At first, get a connection to the authentication agent. */
+  	ac = ssh_get_authentication_connection();
+  	if (ac == NULL) {
+Index: ssh-agent.c
+diff -c ssh-agent.c:1.1.1.4 ssh-agent.c:1.2
+*** ssh-agent.c:1.1.1.4	Thu Sep 25 15:16:37 2003
+--- ssh-agent.c	Tue Nov 30 15:56:27 2004
+***************
+*** 39,44 ****
+--- 39,45 ----
+  
+  #include <openssl/evp.h>
+  #include <openssl/md5.h>
++ #include <openssl/engine.h>
+  
+  #include "ssh.h"
+  #include "rsa.h"
+***************
+*** 1025,1030 ****
+--- 1026,1035 ----
+  
+  	SSLeay_add_all_algorithms();
+  
++ 	/* Init available hardware crypto engines. */
++ 	ENGINE_load_builtin_engines();
++ 	ENGINE_register_all_complete();
++ 
+  	__progname = ssh_get_progname(av[0]);
+  	init_rng();
+  	seed_rng();
+Index: ssh-keygen.c
+diff -c ssh-keygen.c:1.1.1.4 ssh-keygen.c:1.2
+*** ssh-keygen.c:1.1.1.4	Thu Sep 25 15:16:37 2003
+--- ssh-keygen.c	Tue Nov 30 15:56:27 2004
+***************
+*** 16,21 ****
+--- 16,22 ----
+  
+  #include <openssl/evp.h>
+  #include <openssl/pem.h>
++ #include <openssl/engine.h>
+  
+  #include "xmalloc.h"
+  #include "key.h"
+***************
+*** 812,817 ****
+--- 813,823 ----
+  	__progname = ssh_get_progname(av[0]);
+  
+  	SSLeay_add_all_algorithms();
++ 
++ 	/* Init available hardware crypto engines. */
++ 	ENGINE_load_builtin_engines();
++ 	ENGINE_register_all_complete();
++ 
+  	log_init(av[0], SYSLOG_LEVEL_INFO, SYSLOG_FACILITY_USER, 1);
+  
+  	init_rng();
+Index: ssh-keysign.c
+diff -c ssh-keysign.c:1.1.1.3 ssh-keysign.c:1.2
+*** ssh-keysign.c:1.1.1.3	Thu Sep 25 15:16:38 2003
+--- ssh-keysign.c	Tue Nov 30 15:56:27 2004
+***************
+*** 27,32 ****
+--- 27,33 ----
+  #include <openssl/evp.h>
+  #include <openssl/rand.h>
+  #include <openssl/rsa.h>
++ #include <openssl/engine.h>
+  
+  #include "log.h"
+  #include "key.h"
+***************
+*** 181,186 ****
+--- 182,192 ----
+  	pw = pwcopy(pw);
+  
+  	SSLeay_add_all_algorithms();
++ 
++ 	/* Init available hardware crypto engines. */
++ 	ENGINE_load_builtin_engines();
++ 	ENGINE_register_all_complete();
++ 
+  	for (i = 0; i < 256; i++)
+  		rnd[i] = arc4random();
+  	RAND_seed(rnd, sizeof(rnd));
+Index: ssh.c
+diff -c ssh.c:1.1.1.4 ssh.c:1.7
+*** ssh.c:1.1.1.4	Thu Sep 25 15:16:37 2003
+--- ssh.c	Tue Nov 30 15:56:27 2004
+***************
+*** 44,49 ****
+--- 44,50 ----
+  
+  #include <openssl/evp.h>
+  #include <openssl/err.h>
++ #include <openssl/engine.h>
+  
+  #include "ssh.h"
+  #include "ssh1.h"
+***************
+*** 505,510 ****
+--- 506,515 ----
+  	SSLeay_add_all_algorithms();
+  	ERR_load_crypto_strings();
+  
++ 	/* Init available hardware crypto engines. */
++ 	ENGINE_load_builtin_engines();
++ 	ENGINE_register_all_complete();
++ 
+  	/* Initialize the command to execute on remote host. */
+  	buffer_init(&command);
+  
+Index: sshd.c
+diff -c sshd.c:1.1.1.4 sshd.c:1.10
+*** sshd.c:1.1.1.4	Thu Sep 25 15:16:38 2003
+--- sshd.c	Tue Nov 30 15:56:27 2004
+***************
+*** 930,935 ****
+--- 953,962 ----
+  	SSLeay_add_all_algorithms();
+  	channel_set_af(IPv4or6);
+  
++ 	/* Init available hardware crypto engines. */
++ 	ENGINE_load_builtin_engines();
++ 	ENGINE_register_all_complete();
++ 
+  	/*
+  	 * Force logging to stderr until we have loaded the private host
+  	 * key (unless started from inetd)

@@ -1,0 +1,118 @@
+
+Release notes for LSP 88F5182, release: 1.7.6
+============================================================================
+Note: 	This Release didn't pass QA!!
+
+Table of Contents
+-----------------
+
+1.	Contents of Release 1.7.6
+2.	Changes from prev Releases
+3. 	CESA
+4.      Notes
+5.      Disclaimer
+	
+
+1. Contents of Release 
+==========================
+ Included in current release :
+	- Support for ttyS0 over the first uart.
+        - Interrupts handling:
+                Timer interrupt on the internal Tclk timer.
+                PCI/PEX interrupts.
+        - Support for passing Marvell Tag list from the uboot.
+        - MtdBlock on the flash.
+        - Update the Kconfig scripts to include the configuration of the orion.
+        - Heart Beat counting on the 7seg.
+        - Reset support.
+        - Optimized cache flush for context switching.
+	- MV shell Proc FS.
+        - RTC support.
+	- USB support for 88f5x82 as host, value passed from u-boot.
+        - Giga port support for 88f5x82.
+	- Support for Jffs2 as a root.
+	- Support for the Orion Cryptographic Engine and Security Acceleration using the OCF framework.
+
+        - This release is a patch to linux 2.6.12.6 which can be download from (www.kernel.org)
+        - This release should use u-boot 1.7.3 as a loader.
+
+2. Changes from prev Releases
+===================================================
+ Changes from prev Release 1.7.5
+==================================
+ - DMA: Use polling on dma channel status bits and not on interrupt, to eliminate any race on the clearing of the IDMA interrupt register
+	between the CESA engine and the SW.
+ - ocf-bench: Add reinsertion of failed requests, with a timeout of 1 ms.
+ - CESA HAL: Bugs: A large buffer might have sent to channel 1.
+		   A Jumbo buffer might have being insert to channel 0 while another buffer is using one of the other channels.
+	     Fix: Change the logical flow for inserting request through the Action and the ReadyGet API.
+ - CESA OCF: Add debug APIs.
+ - Add Raid-0  support to default config option.
+
+ Changes from prev Release 1.7.4
+==================================
+ - Add WA to CESA: remove the clear of the idma engine, since it is already done by the HW.
+ - Add WA to DMA_CPY: clear only relevant bits in idma cause register.
+ - Add WA to the Eth HAL: leave one spare Tx descriptor in the link list.
+
+ Changes from prev Release 1.7.3
+==================================
+ - Fix a bug in dm-crypt, wrong essiv size when rounding to minimum.
+ - Add non CFI to the default kernel config.
+
+ Changes from prev Release 1.7.2
+==================================
+ - Update board Spec for 5281 and remove tiny option for 5182.
+ - Add RTC device registration.
+ - Improve the cesa debug reports.
+ - Fix Cesa HAL to clear only relevant bits for channel 0 and 1 from the IDMA cause register.
+ - Add physical mapping of the boot flash for RD-5182.
+ - Move the eGiga Tx done handling to the NAPI polling.
+ - Add support for sending idle and idle immediate command through the smart interface.
+ - Fix a bug in dm-crypt: dm-crypt doesn't work in essiv mode when using the OCF.
+ - Add the option for the dm-crypt to use part of the hash result for the cipher in essiv mode.
+ - Enlarge the write timeout for dm-crypt from 2 sec to 30 sec.
+ - Fix a bug in openswan: when removing ipsec module get an error "badness in removing .."
+
+ Changes from prev Release 1.7.1
+==================================
+ - Use the Orion Internal DMAs in order to copy buffer from User to Kernel and backwards.
+ - Fix Cesa HAL to clear only relevant bits for channel 0 and 1 from the IDMA cause register.
+
+ Changes from Release 1.7.0
+==================================
+ - Compile with the new EABI flag.
+ - Update last HALs, including last CESA HAL code.
+ - Use kernel 2.6.12.6 as a baseline instead of 2.6.12.
+
+3. CESA (Cryptographic Engine and Security acceleration)
+========================================================
+ This release include the OCF (http://ocf-linux.sourceforge.net/) code, and add support for using the Orion CESA through the OCF.
+ By using the OCF interface, this release supports Encryption/Authentication HW acceleration on the following:
+ 	OpenSSL - See openssl/README.
+ 	OpenSWAN - See openswan/README.
+ 	dm-crypt - (http://www.saout.de/misc/dm-crypt/) 
+		   a patch is already applied on drivers/md/dm-crypt.c which includes OCF support.
+
+ Check OCF configuration under Cryptographic Options (Kconfig).
+
+4. Notes
+========
+	HowTo:
+		get linux-2.6.12,
+		change its name to the release name.
+		unzip the release.zip in the directory where you put the kernel, say A to replace all.
+		cd to the kernel directory.
+		'make mrproper'
+		'make db88f5182_defconfig'
+		'make uImage'
+		cp arch/arm/boot/uImage to ...
+
+5. Disclaimer
+=============
+This document provides preliminary information about the products described, and such information should not be used for purpose of final design. Visit the Marvell(r) web site at www.marvell.com for the latest information on Marvell products.
+
+No part of this document may be reproduced or transmitted in any form or by any means, electronic or mechanical, including photocopying and recording, for any purpose, without the express written permission of Marvell. Marvell retains the right to make changes to this document at any time, without notice. Marvell makes no warranty of any kind, expressed or implied, with regard to any information contained in this document, including, but not limited to, the implied warranties of merchantability or fitness for any particular purpose. Further, Marvell does not warrant the accuracy or completeness of the information, text, graphics, or other items contained within this document. Marvell makes no commitment either to update or to keep current the information contained in this document. Marvell products are not designed for use in life-support equipment or applications that would cause a life-threatening situation if any such products failed. Do not use Marvell products in these types of equipment or applications. The user should contact Marvell to obtain the latest specifications before finalizing a product design. Marvell assumes no responsibility, either for use of these products or for any infringements of patents and trademarks, or other rights of third parties resulting from its use. No license is granted under any patents, patent rights, or trademarks of Marvell.These products may include one or more optional functions. The user has the choice of implementing any particular optional function. Should the user choose to implement any of these optional functions, it is possible that the use could be subject to third party intellectual property rights. Marvell recommends that the user investigate whether third party intellectual property rights are relevant to the intended use of these products and obtain licenses as appropriate under relevant intellectual property rights. 
+Marvell comprises Marvell Technology Group Ltd. (MTGL) and its subsidiaries, Marvell International Ltd. (MIL), Marvell Semiconductor, Inc. (MSI), Marvell Asia Pte Ltd. (MAPL), Marvell Japan K.K. (MJKK), Marvell Semiconductor Israel Ltd. (MSIL), SysKonnect GmbH, and Radlan Computer Communications, Ltd.
+Export Controls.  With respect to any of Marvell's Information, the user or recipient, in the absence of appropriate U.S. government authorization, agrees: 1) not to re-export or release any such information consisting of technology, software or source code controlled for national security reasons by the U.S. Export Control Regulations ("EAR"), to a national of EAR Country Groups D:1 or E:2; 2) not to export the direct product of such technology or such software, to EAR Country Groups D:1 or E:2, if such technology or software and direct products thereof are controlled for national security reasons by the EAR; and, 3) in the case of technology controlled for national security reasons under the EAR where the direct product of the technology is a complete plant or component of a plant, not to export to EAR Country Groups D:1 or E:2 the direct product of the plant or major component thereof, if such direct product is controlled for national security reasons by the EAR, or is subject to controls under the U.S. Munitions List  ("USML").  At all times hereunder, the recipient of any such information agrees that they shall be deemed to have manually signed this document in connection with their receipt of any such information. 
+Copyright (c) 2004.  Marvell.  All rights reserved.  Marvell, the Marvell logo, Moving Forward Faster, Alaska, and GalNet are registered trademarks of Marvell.  Discovery, Fastwriter, GalTis, Horizon, Libertas, Link Street, NetGX, PHY Advantage, Prestera, Raising The Technology Bar, UniMAC, Virtual Cable Tester, and Yukon are trademarks of Marvell.  All other trademarks are the property of their respective owners.

@@ -1,0 +1,441 @@
+--- openssl-0.9.7e/apps/speed.c	2005-12-12 21:08:37.524735192 +0200
++++ openssl-0.9.7e/apps/speed.c	2005-12-12 21:19:25.271262752 +0200
+@@ -65,6 +65,8 @@
+ #define RSA_SECONDS	10
+ #define DSA_SECONDS	10
+ 
++static int seconds = SECONDS;
++
+ /* 11-Sep-92 Andrew Daviel   Support for Silicon Graphics IRIX added */
+ /* 06-Apr-92 Luke Brennan    Support for VMS and add extra signal calls */
+ 
+@@ -229,6 +231,11 @@
+ #define SIZE_NUM	5
+ #define RSA_NUM		4
+ #define DSA_NUM		3
++
++#define HAVE_SIZE
++static int g_size = SIZE_NUM;
++static double time_multi = 0;
++
+ static const char *names[ALGOR_NUM]={
+   "md2","mdc2","md4","md5","hmac(md5)","sha1","rmd160","rc4",
+   "des cbc","des ede3","idea cbc",
+@@ -446,6 +453,11 @@
+ #endif
+ 	}
+ 
++#ifdef HAVE_FORK
++static 	int multi=0;
++static 	int last_th = 0;
++#endif
++
+ int MAIN(int, char **);
+ 
+ int MAIN(int argc, char **argv)
+@@ -582,9 +594,6 @@
+ 	const EVP_CIPHER *evp_cipher=NULL;
+ 	const EVP_MD *evp_md=NULL;
+ 	int decrypt=0;
+-#ifdef HAVE_FORK
+-	int multi=0;
+-#endif
+ 
+ #ifndef TIMES
+ 	usertime=-1;
+@@ -718,6 +727,27 @@
+ 				   an algorithm. */
+ 			}
+ #endif
++#ifdef HAVE_SIZE
++		else if	((argc > 0) && (strcmp(*argv,"-size") == 0))
++			{
++			argc--;
++			argv++;
++			if(argc == 0)
++				{
++				BIO_printf(bio_err,"no size count given\n");
++				goto end;
++				}
++			g_size=1;
++			lengths[0]=atoi(argv[0]);
++			if(g_size <= 0)
++			    {
++				BIO_printf(bio_err,"bad size count\n");
++				goto end;
++				}				
++			j--;	/* Otherwise, -mr gets confused with
++				   an algorithm. */
++			}
++#endif
+ 		else if (argc > 0 && !strcmp(*argv,"-mr"))
+ 			{
+ 			mr=1;
+@@ -965,7 +995,10 @@
+ 			BIO_printf(bio_err,"-decrypt        time decryption instead of encryption (only EVP).\n");
+ 			BIO_printf(bio_err,"-mr             produce machine readable output.\n");
+ #ifdef HAVE_FORK
+-			BIO_printf(bio_err,"-multi n        run n benchmarks in parallel.\n");
++			BIO_printf(bio_err,"-multi n        run n benchmarks in parallel.\n");	
++#endif
++#ifdef HAVE_SIZE
++			BIO_printf(bio_err,"-size n         run only for size n.\n");
+ #endif
+ #ifdef __linux__
+ 			BIO_printf(bio_err,"-cpu            calculate cpu utilisation.\n");
+@@ -992,9 +1025,21 @@
+ 	for (i=0; i<ALGOR_NUM; i++)
+ 		if (doit[i]) pr_header++;
+ 
+-	if (usertime == 0 && !mr)
++	if(multi && (g_size != 1) || (pr_header !=1 )) 
++		{
++		BIO_printf(bio_err," to get correct results use -elapsed, and use only one evp and only one size.\n");	
++		goto end;
++		}
++	else if(multi) 
++		{
++		seconds = 10;
++		BIO_printf(bio_err," multi results, are including overhead of open and close session, and print results to main theread.\n");
++		BIO_printf(bio_err," to minimize this overhead we will use 10 seconds test. \n");
++		}
++
++	if ((usertime == 0 && !mr) && !multi)
+ 		BIO_printf(bio_err,"You have chosen to measure elapsed time instead of user CPU time.\n");
+-	if (usertime <= 0 && !mr)
++	if ((usertime <= 0 && !mr) && !multi)
+ 		{
+ 		BIO_printf(bio_err,"To get the most accurate results, try to run this\n");
+ 		BIO_printf(bio_err,"program when this computer is idle.\n");
+@@ -1095,7 +1140,7 @@
+ 	c[D_CBC_192_AES][0]=count;
+ 	c[D_CBC_256_AES][0]=count;
+ 
+-	for (i=1; i<SIZE_NUM; i++)
++	for (i=1; i<g_size; i++)
+ 		{
+ 		c[D_MD2][i]=c[D_MD2][0]*4*lengths[0]/lengths[i];
+ 		c[D_MDC2][i]=c[D_MDC2][0]*4*lengths[0]/lengths[i];
+@@ -1105,7 +1150,7 @@
+ 		c[D_SHA1][i]=c[D_SHA1][0]*4*lengths[0]/lengths[i];
+ 		c[D_RMD160][i]=c[D_RMD160][0]*4*lengths[0]/lengths[i];
+ 		}
+-	for (i=1; i<SIZE_NUM; i++)
++	for (i=1; i<g_size; i++)
+ 		{
+ 		long l0,l1;
+ 
+@@ -1176,14 +1221,17 @@
+ #endif /* SIGALRM */
+ 
+ #ifdef HAVE_FORK /* DM */
+-	if(multi && do_multi(multi))
++	if(multi && do_multi(multi)) 
++		{
++		last_th = 1;
+ 		goto show_res;
++		}
+ #endif
+ 
+ #ifndef OPENSSL_NO_MD2
+ 	if (doit[D_MD2])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_MD2],c[D_MD2][j],lengths[j]);
+ 			Time_F(START);
+@@ -1197,7 +1245,7 @@
+ #ifndef OPENSSL_NO_MDC2
+ 	if (doit[D_MDC2])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_MDC2],c[D_MDC2][j],lengths[j]);
+ 			Time_F(START);
+@@ -1212,7 +1260,7 @@
+ #ifndef OPENSSL_NO_MD4
+ 	if (doit[D_MD4])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_MD4],c[D_MD4][j],lengths[j]);
+ 			Time_F(START);
+@@ -1227,7 +1275,7 @@
+ #ifndef OPENSSL_NO_MD5
+ 	if (doit[D_MD5])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_MD5],c[D_MD5][j],lengths[j]);
+ 			Time_F(START);
+@@ -1248,7 +1296,7 @@
+ 		HMAC_Init_ex(&hctx,(unsigned char *)"This is a key...",
+ 			16,EVP_md5(), NULL);
+ 
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_HMAC],c[D_HMAC][j],lengths[j]);
+ 			Time_F(START);
+@@ -1267,7 +1315,7 @@
+ #ifndef OPENSSL_NO_SHA
+ 	if (doit[D_SHA1])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_SHA1],c[D_SHA1][j],lengths[j]);
+ 			Time_F(START);
+@@ -1281,7 +1329,7 @@
+ #ifndef OPENSSL_NO_RIPEMD
+ 	if (doit[D_RMD160])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_RMD160],c[D_RMD160][j],lengths[j]);
+ 			Time_F(START);
+@@ -1295,7 +1343,7 @@
+ #ifndef OPENSSL_NO_RC4
+ 	if (doit[D_RC4])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_RC4],c[D_RC4][j],lengths[j]);
+ 			Time_F(START);
+@@ -1310,7 +1358,7 @@
+ #ifndef OPENSSL_NO_DES
+ 	if (doit[D_CBC_DES])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_CBC_DES],c[D_CBC_DES][j],lengths[j]);
+ 			Time_F(START);
+@@ -1324,7 +1372,7 @@
+ 
+ 	if (doit[D_EDE3_DES])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_EDE3_DES],c[D_EDE3_DES][j],lengths[j]);
+ 			Time_F(START);
+@@ -1340,7 +1388,7 @@
+ #ifndef OPENSSL_NO_AES
+ 	if (doit[D_CBC_128_AES])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_CBC_128_AES],c[D_CBC_128_AES][j],lengths[j]);
+ 			Time_F(START);
+@@ -1354,7 +1402,7 @@
+ 		}
+ 	if (doit[D_CBC_192_AES])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_CBC_192_AES],c[D_CBC_192_AES][j],lengths[j]);
+ 			Time_F(START);
+@@ -1368,7 +1416,7 @@
+ 		}
+ 	if (doit[D_CBC_256_AES])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_CBC_256_AES],c[D_CBC_256_AES][j],lengths[j]);
+ 			Time_F(START);
+@@ -1385,7 +1433,7 @@
+ #ifndef OPENSSL_NO_IDEA
+ 	if (doit[D_CBC_IDEA])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_CBC_IDEA],c[D_CBC_IDEA][j],lengths[j]);
+ 			Time_F(START);
+@@ -1401,7 +1449,7 @@
+ #ifndef OPENSSL_NO_RC2
+ 	if (doit[D_CBC_RC2])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_CBC_RC2],c[D_CBC_RC2][j],lengths[j]);
+ 			Time_F(START);
+@@ -1417,7 +1465,7 @@
+ #ifndef OPENSSL_NO_RC5
+ 	if (doit[D_CBC_RC5])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_CBC_RC5],c[D_CBC_RC5][j],lengths[j]);
+ 			Time_F(START);
+@@ -1433,7 +1481,7 @@
+ #ifndef OPENSSL_NO_BF
+ 	if (doit[D_CBC_BF])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_CBC_BF],c[D_CBC_BF][j],lengths[j]);
+ 			Time_F(START);
+@@ -1449,7 +1497,7 @@
+ #ifndef OPENSSL_NO_CAST
+ 	if (doit[D_CBC_CAST])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			print_message(names[D_CBC_CAST],c[D_CBC_CAST][j],lengths[j]);
+ 			Time_F(START);
+@@ -1465,12 +1513,13 @@
+ 
+ 	if (doit[D_EVP])
+ 		{
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+ 			if (evp_cipher)
+ 				{
+ 				EVP_CIPHER_CTX ctx;
+ 				int outl;
++				unsigned char * buf_m;
+ 
+ 				names[D_EVP]=OBJ_nid2ln(evp_cipher->nid);
+ 				/* -O3 -fschedule-insns messes up an
+@@ -1486,19 +1535,27 @@
+ 
+ 				print_message(names[D_EVP],save_count,
+ 					lengths[j]);
++				if(multi)
++					buf_m = OPENSSL_malloc(lengths[j]);
++				else
++					buf_m = buf;
+ 
+ 				Time_F(START);
+ 				if(decrypt)
+ 					for (count=0,run=1; COND(save_count*4*lengths[0]/lengths[j]); count++)
+-						EVP_DecryptUpdate(&ctx,buf,&outl,buf,lengths[j]);
++						EVP_DecryptUpdate(&ctx,buf_m,&outl,buf_m,lengths[j]);
+ 				else
+ 					for (count=0,run=1; COND(save_count*4*lengths[0]/lengths[j]); count++)
+-						EVP_EncryptUpdate(&ctx,buf,&outl,buf,lengths[j]);
++						EVP_EncryptUpdate(&ctx,buf_m,&outl,buf_m,lengths[j]);
+ 				if(decrypt)
+-					EVP_DecryptFinal_ex(&ctx,buf,&outl);
++					EVP_DecryptFinal_ex(&ctx,buf_m,&outl);
+ 				else
+-					EVP_EncryptFinal_ex(&ctx,buf,&outl);
++					EVP_EncryptFinal_ex(&ctx,buf_m,&outl);
+ 				d=Time_F(STOP);
++			
++				if(multi)
++					OPENSSL_free(buf_m);
++
+ 				EVP_CIPHER_CTX_cleanup(&ctx);
+ 				}
+ 			if (evp_md)
+@@ -1768,7 +1825,7 @@
+ 			fprintf(stdout,"The 'numbers' are in 1000s of bytes per second processed.\n"); 
+ 			fprintf(stdout,"type        ");
+ 			}
+-		for (j=0;  j<SIZE_NUM; j++) {
++		for (j=0;  j<g_size; j++) {
+ 			fprintf(stdout,mr ? ":%d" : "%7d bytes",lengths[j]);
+ 			if (do_cpu && !mr)
+ 				fprintf(stdout, " /cpu");
+@@ -1791,12 +1848,25 @@
+ 			fprintf(stdout,"+F:%d:%s",k,names[k]);
+ 		else
+ 			fprintf(stdout,"%-13s",names[k]);
+-		for (j=0; j<SIZE_NUM; j++)
++		for (j=0; j<g_size; j++)
+ 			{
+-			if (results[k][j] > 10000 && !mr)
++			if (results[k][j] > 10000 && !mr) 
++				{
++				if(multi && last_th) /* in multi only one size can run, in order to get accurate results */
++					{
++					results[k][j] = results[k][j]/time_multi;
++					} 
+ 				fprintf(stdout," %11.2fk",results[k][j]/1e3);
+-			else
++				}
++			else 
++				{
++				if(multi && last_th) /* in multi only one size can run, in order to get accurate results */
++					{
++					results[k][j] = results[k][j]/time_multi;
++					}
+ 				fprintf(stdout,mr ? ":%.2f" : " %11.2f ",results[k][j]);
++				
++				}
+ 			if (do_cpu)
+ 				fprintf(stdout, mr ? "/%d" : "/%%%-3d", cpu_usage[k][j]);
+ 			}
+@@ -1875,9 +1945,9 @@
+ 	{
+ #ifdef SIGALRM
+ 	BIO_printf(bio_err,mr ? "+DT:%s:%d:%d\n"
+-		   : "Doing %s for %ds on %d size blocks: ",s,SECONDS,length);
++		   : "Doing %s for %ds on %d size blocks: ",s,seconds,length);
+ 	(void)BIO_flush(bio_err);
+-	alarm(SECONDS);
++	alarm(seconds);
+ #else
+ 	BIO_printf(bio_err,mr ? "+DN:%s:%ld:%d\n"
+ 		   : "Doing %s %ld times on %d size blocks: ",s,num,length);
+@@ -1912,7 +1982,10 @@
+ 	    cpu_usage[alg][run_no] = calc_cpu();
+ 	BIO_printf(bio_err,mr ? "+R:%ld:%s:%f\n"
+ 		   : "%ld %s's in %.2fs\n",count,names[alg],time_used);
+-	results[alg][run_no]=((double)count)/time_used*lengths[run_no];
++	if(!multi)
++		results[alg][run_no]=((double)count)/time_used*lengths[run_no];
++	else	
++		results[alg][run_no]=((double)count)*lengths[run_no]; 
+ 	}
+ 
+ static char *sstrsep(char **string, const char *delim)
+@@ -1953,8 +2026,12 @@
+ 	int fd[2];
+ 	int *fds;
+ 	static char sep[]=":";
++	long temp;
++	struct timeb t_start,t_end;	
+ 
+ 	fds=malloc(multi*sizeof *fds);
++
++	ftime(&t_start);
+ 	for(n=0 ; n < multi ; ++n)
+ 		{
+ 		pipe(fd);
+@@ -2004,7 +2081,7 @@
+ 				p=buf+3;
+ 				alg=atoi(sstrsep(&p,sep));
+ 				sstrsep(&p,sep);
+-				for(j=0 ; j < SIZE_NUM ; ++j) {
++				for(j=0 ; j < g_size ; ++j) {
+ 					if (do_cpu && strchr(p, '/'))
+ 						cpu_usage[alg][j] = atoi(strchr(p, '/') + 1);
+ 					results[alg][j]+=atof(sstrsep(&p,sep));
+@@ -2071,6 +2148,9 @@
+ 				fprintf(stderr,"Unknown type '%s' from child %d\n",buf,n);
+ 			}
+ 		}
++	ftime(&t_end);
++	temp=(long)t_end.millitm-(long)t_start.millitm;
++	time_multi=((double)(t_end.time-t_start.time))+((double)temp)/1000.0;
+ 	return 1;
+ 	}
+ #endif
